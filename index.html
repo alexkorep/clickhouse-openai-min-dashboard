@@ -147,6 +147,11 @@
             display: none;
         }
 
+        #openai-params {
+            margin-bottom: 0.5rem;
+            display: grid;
+        }
+
         #connection-params {
             margin-bottom: 0.5rem;
             display: grid;
@@ -345,6 +350,9 @@
 <body>
 <div class="inputs unconnected">
     <form id="params">
+        <div id="openai-params">
+            <input spellcheck="false" id="openai-key" type="password" value="" placeholder="OpenAI API key" />
+        </div>
         <div id="connection-params">
             <input spellcheck="false" id="url" type="text" value="" placeholder="URL" />
             <div id="username-password">
@@ -383,6 +391,7 @@
 let host = 'https://play.clickhouse.com/';
 let user = 'explorer';
 let password = '';
+let openaiKey = '';
 
 /// If it is hosted on server, assume that it is the address of ClickHouse.
 if (location.protocol != 'file:') {
@@ -772,7 +781,8 @@ document.getElementById('reload').addEventListener('click', e => {
 function showReloadIfNeeded() {
     const is_any_field_changed = (host != document.getElementById('url').value
                                || user != document.getElementById('user').value
-                               || password != document.getElementById('password').value);
+                               || password != document.getElementById('password').value)
+                               || openaiKey != document.getElementById('openai-key').value;
     if (is_any_field_changed) {
         document.getElementById('reload').style.display = '';
     } else {
@@ -783,6 +793,7 @@ function showReloadIfNeeded() {
 document.getElementById('password').addEventListener('input', e => { showReloadIfNeeded(); })
 document.getElementById('user').addEventListener('input', e => { showReloadIfNeeded(); })
 document.getElementById('url').addEventListener('input', e => { showReloadIfNeeded(); })
+document.getElementById('openai-key').addEventListener('input', e => { showReloadIfNeeded(); })
 
 function legendAsTooltipPlugin({ className, style = { background: "var(--legend-background)" } } = {}) {
     let legendEl;
@@ -845,6 +856,7 @@ async function draw(idx, chart, url_params, query) {
     host = document.getElementById('url').value;
     user = document.getElementById('user').value;
     password = document.getElementById('password').value;
+    openaiKey = document.getElementById('openai-key').value;
 
     let url = `${host}?default_format=JSONCompactColumns`
 
@@ -1043,10 +1055,30 @@ function saveState() {
         window.location.pathname + (window.location.search || '') + '#' + btoa(JSON.stringify(state)));
 }
 
+function makeOpenAIRequest(request) {
+    fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+            model: "gpt-3.5-turbo",
+            messages: [{role: "user", content: request}],
+            temperature: 0.7,
+        })
+    })
+    .then(response => response.json())
+    .then(data => console.log(data.choices[0].message.content));
+    
+}
+
 function regenerate() {
+    makeOpenAIRequest('Hi, how are you today?');
     document.getElementById('url').value = host;
     document.getElementById('user').value = user;
     document.getElementById('password').value = password;
+    document.getElementById('openai-key').value = openaiKey;
 
     findParamsInQueries();
     buildParams();
@@ -1061,6 +1093,7 @@ function regenerate() {
     for (let i = 0; i < queries.length; ++i) {
         insertChart(i);
     }
+
 }
 
 window.onpopstate = function(event) {
