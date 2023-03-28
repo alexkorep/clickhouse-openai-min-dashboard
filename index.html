@@ -150,6 +150,8 @@
         #openai-params {
             margin-bottom: 0.5rem;
             display: grid;
+            grid-template-columns: 69.77% 30%;
+            column-gap: 0.25rem;
         }
 
         #connection-params {
@@ -224,7 +226,14 @@
             margin-bottom: 1rem;
         }
 
-        #add:hover, #reload:hover {
+        #openai-generate {
+            font-weight: bold;
+            cursor: pointer;
+            background: var(--new-chart-background-color);
+            color: var(--new-chart-text-color);
+        }
+
+        #add:hover, #reload:hover, #openai-generate:hover {
             background: var(--button-background-color);
         }
 
@@ -350,15 +359,16 @@
 <body>
 <div class="inputs unconnected">
     <form id="params">
-        <div id="openai-params">
-            <input spellcheck="false" id="openai-key" type="password" value="" placeholder="OpenAI API key" />
-        </div>
         <div id="connection-params">
             <input spellcheck="false" id="url" type="text" value="" placeholder="URL" />
             <div id="username-password">
                 <input spellcheck="false" id="user" type="text" value="" placeholder="user" />
                 <input spellcheck="false" id="password" type="password" placeholder="password" />
             </div>
+        </div>
+        <div id="openai-params">
+            <input spellcheck="false" id="openai-key" type="password" value="" placeholder="OpenAI API key" />
+            <input id="openai-generate" type="button" value="Generate charts">
         </div>
         <div>
             <input id="reload" type="button" value="Reload">
@@ -778,6 +788,15 @@ document.getElementById('reload').addEventListener('click', e => {
     reloadAll();
 });
 
+document.getElementById('openai-generate').addEventListener('click', async e => {
+    // if (!openaiKey) {
+    //     console.log('OpenAI API key is not set.');
+    //     return;
+    // }
+    const structure = await getDatabaseStructure();
+    console.log('db structure', structure);
+});
+
 function showReloadIfNeeded() {
     const is_any_field_changed = (host != document.getElementById('url').value
                                || user != document.getElementById('user').value
@@ -847,16 +866,10 @@ function legendAsTooltipPlugin({ className, style = { background: "var(--legend-
 
 let add_http_cors_header = false;
 
-async function draw(idx, chart, url_params, query) {
-    if (plots[idx]) {
-        plots[idx].destroy();
-        plots[idx] = null;
-    }
-
+async function sendRequestToServer(url_params, query) {
     host = document.getElementById('url').value;
     user = document.getElementById('user').value;
     password = document.getElementById('password').value;
-    openaiKey = document.getElementById('openai-key').value;
 
     let url = `${host}?default_format=JSONCompactColumns`
 
@@ -885,6 +898,47 @@ async function draw(idx, chart, url_params, query) {
         console.log(e);
         error = e.toString();
     }
+    return {data, error}
+}
+
+async function getDatabaseStructure() {
+    const MAX_TABLE_COUNT = 10;
+
+    const {data, error} = await sendRequestToServer('', 'SHOW TABLES');
+    if (error) {
+        console.log(error);
+        return;
+    }
+    const tables = data[0];
+    // console.log('tables:', tables);
+    let result = '';
+    for (let i = 0; i < Math.min(MAX_TABLE_COUNT, tables.length); i++) {
+        const table = tables[i];
+        const {data, error} = await sendRequestToServer('', `DESCRIBE TABLE ${table}`);
+        if (error) {
+            console.log(`Cannot get ${table} structure:`, error);
+            return;
+        }
+        const [columnsNames, columnTypes] = data;
+        // console.log('columns data:', data);
+        result += `${table} (\n`;
+        for (let j = 0; j < columnsNames.length; j++) {
+            const name = columnsNames[j];
+            const colType = columnTypes[j];
+            result += `  ${name} ${colType}, \n`;
+        }
+        result += ")\n"
+    }
+    return result
+}
+
+async function draw(idx, chart, url_params, query) {
+    if (plots[idx]) {
+        plots[idx].destroy();
+        plots[idx] = null;
+    }
+
+    let {data, error} = await sendRequestToServer(url_params, query);
 
     if (error) {
         const errorMatch = error.match(errorCodeRegex)
@@ -1056,6 +1110,11 @@ function saveState() {
 }
 
 function makeOpenAIRequest(request) {
+    openaiKey = document.getElementById('openai-key').value;
+
+    if (!openaiKey) {
+        return;
+    }
     fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -1074,7 +1133,8 @@ function makeOpenAIRequest(request) {
 }
 
 function regenerate() {
-    makeOpenAIRequest('Hi, how are you today?');
+    // getDatabaseStructure();
+    // makeOpenAIRequest('Hi, how are you today?');
     document.getElementById('url').value = host;
     document.getElementById('user').value = user;
     document.getElementById('password').value = password;
