@@ -811,16 +811,23 @@ If you need to convert DateTime to timestamp, use the following example:
 toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND)::INT
 \`\`\`
 Respond in JSON format:
-[{
-"title": "Query title",
-"query": "Query SQL",
-}, ...]`;
+{
+    result: [
+        {
+            "title": "Query title",
+            "query": "Query SQL"
+        }, 
+        ...
+    ]
+}`;
     console.log('Sending OpenAI request...')
     const answer = await makeOpenAIRequest(prompt);
     console.log('answer', answer);
-    const newQueries = JSON.parse(answer);
+    const newQueries = JSON.parse(answer).result;
     console.log('newQueries', newQueries);
-    queries = queries.concat(newQueries);
+    //queries = queries.concat(newQueries);
+    queries = newQueries;
+    console.log('queries', queries);
     console.log('Updating charts...')
     //reloadAll();
     regenerate();
