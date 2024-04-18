@@ -821,6 +821,7 @@ Respond in JSON format:
     ]
 }`;
     console.log('Sending OpenAI request...')
+    console.log('prompt:', prompt);
     const answer = await makeOpenAIRequest(prompt);
     console.log('answer', answer);
     const newQueries = JSON.parse(answer).result;
@@ -831,7 +832,7 @@ Respond in JSON format:
     console.log('Updating charts...')
     //reloadAll();
     regenerate();
-    //drawAll();
+    drawAll();
     console.log('Done!')
 });
 
@@ -1160,9 +1161,11 @@ async function makeOpenAIRequest(request) {
             'Authorization': `Bearer ${openaiKey}`,
         },
         body: JSON.stringify({
-            model: "gpt-3.5-turbo",
+            //model: "gpt-3.5-turbo",
+            model: "gpt-4-turbo",
             messages: [{role: "user", content: request}],
             temperature: 0.7,
+            response_format: { type: "json_object" }
         })
     })
     const data = await response.json();
